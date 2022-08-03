@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Micro-Manager">
+    <CLASSES>
+      <root url="file://D:/Programs/Micro-Manager-2.0/plugins/Micro-Manager" />
+      <root url="jar://D:/Programs/Micro-Manager-2.0/ij.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.ideaLibSources/PycroManagerJava-0.22.5-sources.jar!/" />
+    </SOURCES>
+    <jarDirectory url="file://D:/Programs/Micro-Manager-2.0/plugins/Micro-Manager" recursive="false" />
+  </library>
+</component>
