@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Independent">
+    <output-path>$PROJECT_DIR$/out/artifacts/Independent</output-path>
+    <root id="archive" name="Independent.jar">
+      <element id="module-output" name="PythonEventServer" />
+    </root>
+  </artifact>
+</component>

@@ -19,7 +19,7 @@ setup(
         "Operating System :: OS Independent",
     ],
     packages=["pymm_eventserver"],
-    package_data={"": ["settings.json", "java/out/artifacts/PythonEventServer.jar"]},
+    package_data={"": ["settings.json", "PythonEventServer.jar"]},
     include_package_data=True,
     install_requires=[
         "pycromanager",

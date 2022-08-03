@@ -1,6 +1,6 @@
 <component name="ArtifactManager">
-  <artifact type="jar" name="PythonEventServer">
-    <output-path>$PROJECT_DIR$/out/artifacts/PythonEventServer</output-path>
+  <artifact type="jar" build-on-make="true" name="PythonEventServer">
+    <output-path>$PROJECT_DIR$/../pymm_eventserver</output-path>
     <root id="archive" name="PythonEventServer.jar">
       <element id="module-output" name="PythonEventServer" />
     </root>
