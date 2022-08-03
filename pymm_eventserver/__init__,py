@@ -1,0 +1,4 @@
+name = "pymm_eventserver"
+
+import data_structures
+import event_thread
