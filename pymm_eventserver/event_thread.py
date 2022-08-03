@@ -14,22 +14,17 @@ import numpy as np
 
 import zmq
 from pycromanager import Bridge
-from qtpy.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
+from qtpy.QtCore import QObject, QThread, Signal, Slot
 
-from pymm_eventserver.python.data_structures import MMSettings
-
-from pymm_eventserver.python.data_structures import PyImage
+from .data_structures import MMSettings
+from .data_structures import PyImage
 
 log = logging.getLogger("EDA")
 SOCKET = "5556"
 
 
 class EventThread(QObject):
-    """Thread that receives events from Micro-Manager and relays them to the main program.
-
-    See https://github.com/wl-stepp/micro-manager-isim -> PythonEventServer for the other side of
-    the communication.
-    """
+    """Thread that receives events from Micro-Manager and relays them to the main program. """
 
     def __init__(self):
         """Set up the bridge to Micro-Manager, ZMQ sockets and the main listener Thread."""
@@ -41,7 +36,7 @@ class EventThread(QObject):
         self.event_sockets = []
         self.num_sockets = 5
         for socket in range(self.num_sockets):
-            socket_provider = self.bridge.construct_java_object(
+            socket_provider = self.bridge._construct_java_object(
                 "org.micromanager.Studio", new_socket=True
             )
             self.event_sockets.append(socket_provider._socket)
@@ -96,12 +91,12 @@ class EventListener(QObject):
     But also in the index.
     """
 
-    acquisition_started_event = pyqtSignal(object)
-    acquisition_ended_event = pyqtSignal(object)
-    new_image_event = pyqtSignal(PyImage)
-    configuration_settings_event = pyqtSignal(str, str, str)
-    stop_thread_event = pyqtSignal()
-    mda_settings_event = pyqtSignal(MMSettings)
+    acquisition_started_event = Signal(object)
+    acquisition_ended_event = Signal(object)
+    new_image_event = Signal(PyImage)
+    configuration_settings_event = Signal(str, str, str)
+    stop_thread_event = Signal()
+    mda_settings_event = Signal(MMSettings)
 
     def __init__(self, socket, event_sockets, bridge: Bridge, thread: QThread):
         """Store passed arguments and starting time for frequency limitation of certain events."""
@@ -119,7 +114,7 @@ class EventListener(QObject):
         self.blockImages = False
         self.timeouts = 0
 
-    @pyqtSlot()
+    @Slot()
     def start(self):
         """Listen on the zmq socket.
 
@@ -130,6 +125,7 @@ class EventListener(QObject):
         parts of the EDA loop.
         """
         instance = 0
+        print("EventServer running")
         while not self.loop_stop:
             instance = instance + 1 if instance < 100 else 0
             try:
@@ -193,7 +189,7 @@ class EventListener(QObject):
                 # print("Server timeout", self.timeouts)
                 pass
 
-    @pyqtSlot()
+    @Slot()
     def stop(self):
         """Thread was stopped, let's also close the socket then."""
         self.loop_stop = True
@@ -205,6 +201,7 @@ class EventListener(QObject):
 def main():
     """Start an EventThread, can be used to test PythonEventServer plugin from Micro-Manager."""
     thread = EventThread()
+    print("Stop using keyboard interrupt")
     while True:
         try:
             time.sleep(0.01)
