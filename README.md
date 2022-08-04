@@ -6,8 +6,9 @@ functionality from PycroManager (https://pycro-manager.readthedocs.io/en/latest/
 
 The server follows the logic of Pycromanager:
 
-sequenceDiagram
 
+'''mermaid
+sequenceDiagram
     MicroManager->>ZMQ: Event
     activate MicroManager
     Note over MicroManager: Store java object
@@ -19,6 +20,7 @@ sequenceDiagram
     ZMQ->>Code: Output
     Note over MicroManager: Keep object for <br> later calls
     deactivate MicroManager
+'''
 
 The exception are events that contain image data. As keeping those object in memory on the java
 side will lead to pretty heavy memory usage in the ImageJ heap space pretty quickly. So these are
