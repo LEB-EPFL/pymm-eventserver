@@ -261,13 +261,6 @@ public class PythonEventServerFrame extends JFrame {
       @Subscribe
       public void onAcquisitionEnded(AcquisitionEndedEvent event) {
          sendJSON(event, "Acquisition ");
-         try {
-            Thread.sleep(1000);
-         } catch (InterruptedException e) {
-            e.printStackTrace();
-         }
-         imageListener_.close();
-         imageListener_ = null;
          addLog("AcquisitionEndedEvent");
       }
 
@@ -299,7 +292,7 @@ public class PythonEventServerFrame extends JFrame {
       @Subscribe
       public void onAcquisitionSequenceStarted(AcquisitionSequenceStartedEvent event) {
          sendJSON(event, "Acquisition ");
-         imageListener_ = new ImageListener(studio_, this, event.getDatastore());
+         event.getDatastore().registerForEvents(this);
          addLog("AcquisitionSequenceStartedEvent");
       }
 
@@ -311,11 +304,11 @@ public class PythonEventServerFrame extends JFrame {
 //      }
 
 
-//      @Subscribe
-//      public void onDataProviderHasNewImageEvent(DataProviderHasNewImageEvent event){
-//         sendJSON(event, "NewImage ");
-//         addLog("DataProviderHasNewImageEvent");
-//      }
+      @Subscribe
+      public void onDataProviderHasNewImageEvent(DataProviderHasNewImageEvent event){
+         sendImage(event);
+         addLog("DataProviderHasNewImageEvent");
+      }
 
 //      @Subscribe
 //      public void onDataViewerAddedEvent(DataViewerAddedEvent event){
