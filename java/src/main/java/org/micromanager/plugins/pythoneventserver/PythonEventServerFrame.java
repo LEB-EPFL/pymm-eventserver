@@ -258,7 +258,8 @@ public class PythonEventServerFrame extends JFrame {
       }
 
       @Subscribe
-      public void onAcquisitionEnded(AcquisitionEndedEvent event) {
+      public void onAcquisitionEnded(AcquisitionEndedEvent event) throws InterruptedException {
+         Thread.sleep(1000);
          sendJSON(event, "Acquisition ");
          addLog("AcquisitionEndedEvent");
       }
