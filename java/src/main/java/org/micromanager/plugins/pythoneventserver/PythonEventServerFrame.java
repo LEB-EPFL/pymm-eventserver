@@ -133,6 +133,8 @@ public class PythonEventServerFrame extends JFrame {
 
    public class ServerThread extends Thread implements AcqSettingsListener {
 
+      boolean blockSocket_ = true;
+
       public void init(){
          final Context context = context(1);
          socket_ = context.socket(SocketType.PUB);
@@ -339,7 +341,6 @@ public class PythonEventServerFrame extends JFrame {
          logTextArea.setText(newEvent + "\n" + currentText);
        }
 
-      @MustCallOnEDT
       public void sendImage(DataProviderHasNewImageEvent event){
          Image image = event.getImage();
          ArrayList<Float> imageParams = new ArrayList<>();
@@ -349,16 +350,25 @@ public class PythonEventServerFrame extends JFrame {
          imageParams.add((float) image.getCoords().getC());
          imageParams.add((float) image.getCoords().getZ());
          imageParams.add((float) image.getMetadata().getElapsedTimeMs(0));
+         blockSocket_ = true;
          socket_.sendMore("NewImage " + imageParams);
          socket_.sendMore(String.valueOf(image.getBytesPerComponent()));
          socket_.send(image.getByteArray());
+         blockSocket_ = false;
          addLog("NewImage");
       }
 
-      @MustCallOnEDT
-      public void sendJSON(Object event, String type){
+      public void sendJSON(Object event, String type) {
             JSONObject json = new JSONObject();
             util_.serialize(event, json, 5556);
+            while (blockSocket_){
+               try {
+                  Thread.sleep(500);
+               } catch (InterruptedException e) {
+                  e.printStackTrace();
+               }
+               addLog("wait to send" + type);
+            }
             socket_.send(type + json);
          }
       }
