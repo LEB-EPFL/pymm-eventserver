@@ -6,6 +6,7 @@ acquisition. Used with some ImageAnalysers to receive images and to react to sta
 acquisitions.
 """
 
+from ctypes import alignment
 import json
 import logging
 import re
@@ -26,9 +27,11 @@ SOCKET = "5556"
 class EventThread(QObject):
     """Thread that receives events from Micro-Manager and relays them to the main program. """
 
-    def __init__(self):
+    def __init__(self, live_images: bool = False):
         """Set up the bridge to Micro-Manager, ZMQ sockets and the main listener Thread."""
         super().__init__()
+
+        self.live_images = live_images
 
         self.bridge = Bridge(debug=False)
 
@@ -45,7 +48,7 @@ class EventThread(QObject):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.connect("tcp://localhost:" + SOCKET)
-        self.socket.setsockopt(zmq.RCVTIMEO, 1000)  # Timeout for the recv() function
+        self.socket.setsockopt(zmq.RCVTIMEO, 10000)  # Timeout for the recv() function
 
         self.thread_stop = False
 
@@ -64,7 +67,8 @@ class EventThread(QObject):
 
         # Set up the main listener Thread
         self.thread = QThread()
-        self.listener = EventListener(self.socket, self.event_sockets, self.bridge, self.thread)
+        self.listener = EventListener(self.socket, self.event_sockets, self.bridge, self.thread,
+                                      self.live_images)
         self.listener.moveToThread(self.thread)
         self.thread.started.connect(self.listener.start)
         self.listener.stop_thread_event.connect(self.stop)
@@ -97,10 +101,15 @@ class EventListener(QObject):
     configuration_settings_event = Signal(str, str, str)
     stop_thread_event = Signal()
     mda_settings_event = Signal(MMSettings)
+    live_mode_event = Signal(bool)
+    xy_stage_position_changed_event = Signal(tuple)
+    stage_position_changed_event = Signal(float)
 
-    def __init__(self, socket, event_sockets, bridge: Bridge, thread: QThread):
+    def __init__(self, socket, event_sockets, bridge: Bridge, thread: QThread,
+                 send_live_images: bool = False):
         """Store passed arguments and starting time for frequency limitation of certain events."""
         super().__init__()
+        self.send_live_images = send_live_images
         self.loop_stop = False
         self.socket = socket
         self.event_sockets = event_sockets
@@ -128,25 +137,16 @@ class EventListener(QObject):
         print("EventServer running")
         while not self.loop_stop:
             instance = instance + 1 if instance < 100 else 0
+            eventString = "NoEvent"
             try:
                 #  Get the reply.
-
                 reply = str(self.socket.recv())
                 # topic = re.split(' ', reply)[0][2:]
 
                 # Translate the event to a shadow object
                 try:
                     message = json.loads(re.split(" ", reply)[1][0:-1])
-                    socket_num = instance % len(self.event_sockets)
-
-                    eventString = message["class"].split(r".")[-1]
-                    log.info(eventString)
-                    pre_evt = self.bridge._class_factory.create(message)
-                    evt = pre_evt(
-                        socket=self.event_sockets[socket_num],
-                        serialized_object=message,
-                        bridge=self.bridge,
-                    )
+                    evt, eventString = self.translate_message(message, instance)
                 except json.decoder.JSONDecodeError:
                     if self.blockImages:
                         return
@@ -154,16 +154,21 @@ class EventListener(QObject):
                     image_bit = str(self.socket.recv())
                     # TODO: Maybe this should also be done for other bitdepths?!
                     image_depth = np.uint16 if image_bit == "b'2'" else np.uint8
-                    image = np.frombuffer(self.socket.recv(), dtype=image_depth)
-                    print("IMAGE TYPE:", image.dtype)
-                    image_params = re.split("NewImage ", reply)[1]
-                    image_params = re.split(", ", image_params[1:-2])
-                    image_params = [int(round(float(x))) for x in image_params]
-                    py_image = PyImage(
-                        image.reshape([int(image_params[0]), int(image_params[1])]),
-                        *image_params[2:]
-                    )
-                    self.new_image_event.emit(py_image)
+                    next_message = self.socket.recv()
+                    print(next_message[:4])
+                    if str(next_message[:4]) == "b'Acqu'":  # AcquisitionEndedEvent interrupted
+                        print("Acquisition ENDED?")
+                        next_message = json.loads(re.split(" ", str(next_message))[1][0:-1])
+                        evt, eventString = self.translate_message(next_message, instance)
+                        print(eventString)
+                        image_message = self.socket.recv()
+                        print(image_message[:4])
+                        py_image = self.image_from_message(image_message, reply, image_depth)
+                        self.new_image_event.emit(py_image)
+                    else:
+                        py_image = self.image_from_message(next_message, reply, image_depth)
+                        self.new_image_event.emit(py_image)
+
                 print(eventString)
                 if "DefaultAcquisitionStartedEvent" in eventString:
                     if time.perf_counter() - self.last_acq_started > 0.2:
@@ -177,17 +182,59 @@ class EventListener(QObject):
                     self.configuration_settings_event.emit(
                         evt.get_device(), evt.get_property(), evt.get_value()
                     )
+                elif "DefaultStagePositionChangedEvent" in eventString:
+                    if (
+                        self.blockZ > 0
+                        or time.perf_counter() - self.last_stage_position < 0.05
+                    ):
+                        print("BLOCKED ", self.blockZ)
+                    else:
+                        self.stage_position_changed_event.emit(evt.get_pos() * 100)
+                    self.last_stage_position = time.perf_counter()
+                    self.blockZ = False
                 elif "CustomMDAEvent" in eventString:
                     if time.perf_counter() - self.last_custom_mda > 0.2:
                         settings = evt.get_settings()
                         settings = MMSettings(java_settings=settings)
+                        print(settings)
                         self.mda_settings_event.emit(settings)
                     self.last_custom_mda = time.perf_counter()
-
+                elif "DefaultLiveModeEvent" in eventString:
+                    if not self.send_live_images:
+                        self.blockImages = evt.get_is_on()
+                    self.live_mode_event.emit(self.blockImages)
+                elif "XYStagePositionChangedEvent" in eventString:
+                    self.xy_stage_position_changed_event.emit(
+                        (evt.get_x_pos(), evt.get_y_pos())
+                    )
             except zmq.error.Again:
                 self.timeouts += 1
                 # print("Server timeout", self.timeouts)
                 pass
+
+    def image_from_message(self, message, reply, image_depth):
+        image = np.frombuffer(message, dtype=image_depth)
+        image_params = re.split("NewImage ", reply)[1]
+        image_params = re.split(", ", image_params[1:-2])
+        image_params = [int(round(float(x))) for x in image_params]
+        py_image = PyImage(
+            image.reshape([int(image_params[0]), int(image_params[1])]),
+            *image_params[2:]
+        )
+        return py_image
+
+    def translate_message(self, message, instance):
+        socket_num = instance % len(self.event_sockets)
+
+        eventString = message["class"].split(r".")[-1]
+        log.info(eventString)
+        pre_evt = self.bridge._class_factory.create(message)
+        evt = pre_evt(
+            socket=self.event_sockets[socket_num],
+            serialized_object=message,
+            bridge=self.bridge,
+        )
+        return evt, eventString
 
     @Slot()
     def stop(self):
