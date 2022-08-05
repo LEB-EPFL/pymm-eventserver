@@ -133,7 +133,7 @@ public class PythonEventServerFrame extends JFrame {
 
    public class ServerThread extends Thread implements AcqSettingsListener {
 
-      boolean blockSocket_ = true;
+      boolean blockSocket_ = false;
 
       public void init(){
          final Context context = context(1);
