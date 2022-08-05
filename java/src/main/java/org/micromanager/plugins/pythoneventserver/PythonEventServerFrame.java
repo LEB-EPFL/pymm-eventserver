@@ -310,6 +310,7 @@ public class PythonEventServerFrame extends JFrame {
 //         event.getDatastore().unregisterForEvents(this);
 //      }
 
+
 //      @Subscribe
 //      public void onDataProviderHasNewImageEvent(DataProviderHasNewImageEvent event){
 //         sendJSON(event, "NewImage ");
