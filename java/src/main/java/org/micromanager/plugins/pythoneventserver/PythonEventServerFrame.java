@@ -15,6 +15,7 @@ import org.micromanager.events.*;
 import org.micromanager.internal.ConfigGroupPad;
 import org.micromanager.internal.MMStudio;
 import org.micromanager.internal.interfaces.AcqSettingsListener;
+import org.micromanager.internal.utils.MustCallOnEDT;
 import org.micromanager.internal.utils.WindowPositioning;
 import org.micromanager.internal.zmq.ZMQUtil;
 import org.zeromq.SocketType;
@@ -131,8 +132,6 @@ public class PythonEventServerFrame extends JFrame {
 
 
    public class ServerThread extends Thread implements AcqSettingsListener {
-      private ImageListener imageListener_;
-
 
       public void init(){
          final Context context = context(1);
@@ -288,7 +287,6 @@ public class PythonEventServerFrame extends JFrame {
 //         event.getDataViewer().getDataProvider().unregisterForEvents(this);
 //      }
 
-
       @Subscribe
       public void onAcquisitionSequenceStarted(AcquisitionSequenceStartedEvent event) {
          sendJSON(event, "Acquisition ");
@@ -318,12 +316,9 @@ public class PythonEventServerFrame extends JFrame {
       @Subscribe
       public void onLiveMode(LiveModeEvent event) {
          if (event.isOn() & liveCheckBox_.isSelected()) {
-            imageListener_ = new ImageListener(studio_, this,
-                    (Datastore) studio_.getSnapLiveManager().getDisplay().getDataProvider());
+            studio_.getSnapLiveManager().getDisplay().getDataProvider().registerForEvents(this);
          } else {
-            if (imageListener_ != null){
-               imageListener_.close();
-            }
+            studio_.getSnapLiveManager().getDisplay().getDataProvider().unregisterForEvents(this);
          }
          sendJSON(event, "LiveMode ");
          addLog("LiveModeEvent");
@@ -343,21 +338,23 @@ public class PythonEventServerFrame extends JFrame {
          logTextArea.setText(newEvent + "\n" + currentText);
        }
 
-       public void sendImage(DataProviderHasNewImageEvent event){
-          Image image = event.getImage();
-          ArrayList<Float> imageParams = new ArrayList<>();
-          imageParams.add((float) image.getWidth());
-          imageParams.add((float) image.getHeight());
-          imageParams.add((float) image.getCoords().getT());
-          imageParams.add((float) image.getCoords().getC());
-          imageParams.add((float) image.getCoords().getZ());
-          imageParams.add((float) image.getMetadata().getElapsedTimeMs(0));
-          socket_.sendMore("NewImage " + imageParams);
-          socket_.sendMore(String.valueOf(image.getBytesPerComponent()));
-          socket_.send(image.getByteArray());
-          addLog("NewImage");
-       }
+      @MustCallOnEDT
+      public void sendImage(DataProviderHasNewImageEvent event){
+         Image image = event.getImage();
+         ArrayList<Float> imageParams = new ArrayList<>();
+         imageParams.add((float) image.getWidth());
+         imageParams.add((float) image.getHeight());
+         imageParams.add((float) image.getCoords().getT());
+         imageParams.add((float) image.getCoords().getC());
+         imageParams.add((float) image.getCoords().getZ());
+         imageParams.add((float) image.getMetadata().getElapsedTimeMs(0));
+         socket_.sendMore("NewImage " + imageParams);
+         socket_.sendMore(String.valueOf(image.getBytesPerComponent()));
+         socket_.send(image.getByteArray());
+         addLog("NewImage");
+      }
 
+      @MustCallOnEDT
       public void sendJSON(Object event, String type){
             JSONObject json = new JSONObject();
             util_.serialize(event, json, 5556);
