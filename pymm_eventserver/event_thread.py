@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import time
+from typing import Union
 import numpy as np
 
 import zmq
@@ -27,7 +28,7 @@ SOCKET = "5556"
 class EventThread(QObject):
     """Thread that receives events from Micro-Manager and relays them to the main program. """
 
-    def __init__(self, live_images: bool = False):
+    def __init__(self, live_images: bool = False, topics: Union[str, list] = "all"):
         """Set up the bridge to Micro-Manager, ZMQ sockets and the main listener Thread."""
         super().__init__()
 
@@ -52,16 +53,20 @@ class EventThread(QObject):
 
         self.thread_stop = False
 
-        self.topics = [
-            "StandardEvent",
-            "GUIRefreshEvent",
-            "LiveMode",
-            "Acquisition",
-            "GUI",
-            "Hardware",
-            "Settings",
-            "NewImage",
-        ]
+        if topics.lower() == "all":
+            self.topics = [
+                "StandardEvent",
+                "GUIRefreshEvent",
+                "LiveMode",
+                "Acquisition",
+                "GUI",
+                "Hardware",
+                "Settings",
+                "NewImage",
+            ]
+        else:
+            self.topics = topics
+
         for topic in self.topics:
             self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
