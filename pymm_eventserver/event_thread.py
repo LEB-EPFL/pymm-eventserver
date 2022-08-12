@@ -26,7 +26,7 @@ SOCKET = "5556"
 
 
 class EventThread(QObject):
-    """Thread that receives events from Micro-Manager and relays them to the main program. """
+    """Thread that receives events from Micro-Manager and relays them to the main program."""
 
     def __init__(self, live_images: bool = False, topics: Union[str, list] = "all"):
         """Set up the bridge to Micro-Manager, ZMQ sockets and the main listener Thread."""
@@ -49,7 +49,7 @@ class EventThread(QObject):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.connect("tcp://localhost:" + SOCKET)
-        self.socket.setsockopt(zmq.RCVTIMEO, 10000)  # Timeout for the recv() function
+        self.socket.setsockopt(zmq.RCVTIMEO, 1000)  # Timeout for the recv() function
 
         self.thread_stop = False
 
@@ -72,8 +72,9 @@ class EventThread(QObject):
 
         # Set up the main listener Thread
         self.thread = QThread()
-        self.listener = EventListener(self.socket, self.event_sockets, self.bridge, self.thread,
-                                      self.live_images)
+        self.listener = EventListener(
+            self.socket, self.event_sockets, self.bridge, self.thread, self.live_images
+        )
         self.listener.moveToThread(self.thread)
         self.thread.started.connect(self.listener.start)
         self.listener.stop_thread_event.connect(self.stop)
@@ -110,8 +111,14 @@ class EventListener(QObject):
     xy_stage_position_changed_event = Signal(tuple)
     stage_position_changed_event = Signal(float)
 
-    def __init__(self, socket, event_sockets, bridge: Bridge, thread: QThread,
-                 send_live_images: bool = False):
+    def __init__(
+        self,
+        socket,
+        event_sockets,
+        bridge: Bridge,
+        thread: QThread,
+        send_live_images: bool = False,
+    ):
         """Store passed arguments and starting time for frequency limitation of certain events."""
         super().__init__()
         self.send_live_images = send_live_images
@@ -159,20 +166,13 @@ class EventListener(QObject):
                     image_bit = str(self.socket.recv())
                     # TODO: Maybe this should also be done for other bitdepths?!
                     image_depth = np.uint16 if image_bit == "b'2'" else np.uint8
+                    metadata = self.socket.recv()
+                    metadata_dict = json.loads(str(metadata)[11:-1])
                     next_message = self.socket.recv()
-                    print(next_message[:4])
-                    if str(next_message[:4]) == "b'Acqu'":  # AcquisitionEndedEvent interrupted
-                        print("Acquisition ENDED?")
-                        next_message = json.loads(re.split(" ", str(next_message))[1][0:-1])
-                        evt, eventString = self.translate_message(next_message, instance)
-                        print(eventString)
-                        image_message = self.socket.recv()
-                        print(image_message[:4])
-                        py_image = self.image_from_message(image_message, reply, image_depth)
-                        self.new_image_event.emit(py_image)
-                    else:
-                        py_image = self.image_from_message(next_message, reply, image_depth)
-                        self.new_image_event.emit(py_image)
+                    py_image = self.image_from_message(
+                        next_message, reply, image_depth, metadata_dict
+                    )
+                    self.new_image_event.emit(py_image)
 
                 print(eventString)
                 if "DefaultAcquisitionStartedEvent" in eventString:
@@ -217,13 +217,14 @@ class EventListener(QObject):
                 # print("Server timeout", self.timeouts)
                 pass
 
-    def image_from_message(self, message, reply, image_depth):
+    def image_from_message(self, message, reply, image_depth, metadata_dict):
         image = np.frombuffer(message, dtype=image_depth)
         image_params = re.split("NewImage ", reply)[1]
         image_params = re.split(", ", image_params[1:-2])
         image_params = [int(round(float(x))) for x in image_params]
         py_image = PyImage(
             image.reshape([int(image_params[0]), int(image_params[1])]),
+            metadata_dict,
             *image_params[2:]
         )
         return py_image

@@ -60,6 +60,7 @@ class PyImage:
     """Image as a standard ndarray with very basic metadata attached."""
 
     raw_image: np.ndarray
+    metadata: dict
     timepoint: int
     channel: int
     z_slice: int
