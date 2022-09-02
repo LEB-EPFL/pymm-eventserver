@@ -1,7 +1,9 @@
 """Dataclassed used to bundle information."""
 
 
-from dataclasses import dataclass
+from __future__ import annotations
+from collections import defaultdict
+from dataclasses import dataclass, field
 import numpy as np
 import logging
 
@@ -51,8 +53,12 @@ class ParameterSet:
             self.upper_threshold = args[0]["upper_threshold"]
 
     def to_dict(self):
-        return{"slow_interval": self.slow_interval, "fast_interval": self.fast_interval,
-               "lower_threshold": self.lower_threshold, "upper_threshold": self.upper_threshold}
+        return {
+            "slow_interval": self.slow_interval,
+            "fast_interval": self.fast_interval,
+            "lower_threshold": self.lower_threshold,
+            "upper_threshold": self.upper_threshold,
+        }
 
 
 @dataclass
@@ -78,6 +84,24 @@ class MMChannel:
 
 
 @dataclass
+class PrimeBSI:
+    id: str = "Detector:0"
+    manufacturer: str = "Photometrics"
+    model: str = "Prime-BSI"
+    serial_number: str = "v1.0"
+    offset: float = 0.0
+
+
+@dataclass
+class iSIM:
+    """Class for the default iSIM microscope."""
+
+    manufacturer: str = "Dora"
+    model: str = "iSIM"
+    detector: object = PrimeBSI()
+
+
+@dataclass
 class MMSettings:
     """Settings mainly as in MM, but some things are iSIM specific.
 
@@ -99,7 +123,7 @@ class MMSettings:
     java_channels: Any = None
     channel_group: str = None
     use_channels = True
-    channels: List[MMChannel] = None
+    channels: defaultdict[dict] = field(default_factory=lambda: defaultdict(dict))
     n_channels: int = 0
 
     slices_start: float = None
@@ -115,6 +139,7 @@ class MMSettings:
     sweeps_per_frame: int = 1
 
     acq_order: str = None
+    microscope: object = iSIM()
 
     def __post_init__(self):
         """Take the settings from MM as a java object and get the settings are represented here.
@@ -129,17 +154,15 @@ class MMSettings:
             self.acq_order = self.java_settings.acq_order_mode()
             self.use_channels = self.java_settings.use_channels()
             self.channel_group = self.java_settings.channel_group()
-            if all([self.channel_group.lower() == "emission filter",
-                    self.use_channels]):
+            if all([self.channel_group.lower() == "emission filter", self.use_channels]):
                 self.post_delay = 0.5
-            self.acq_order_mode= self.java_settings.acq_order_mode()
+            self.acq_order_mode = self.java_settings.acq_order_mode()
 
         try:
             self.java_channels.size()
         except:
             return
 
-        self.channels = {}
         self.n_channels = 0
         for channel_ind in range(self.java_channels.size()):
             channel = self.java_channels.get(channel_ind)
