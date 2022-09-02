@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import time
+from typing import Union
 import numpy as np
 
 import zmq
@@ -25,9 +26,9 @@ SOCKET = "5556"
 
 
 class EventThread(QObject):
-    """Thread that receives events from Micro-Manager and relays them to the main program. """
+    """Thread that receives events from Micro-Manager and relays them to the main program."""
 
-    def __init__(self, live_images: bool = False):
+    def __init__(self, live_images: bool = False, topics: Union[str, list] = "all"):
         """Set up the bridge to Micro-Manager, ZMQ sockets and the main listener Thread."""
         super().__init__()
 
@@ -52,23 +53,28 @@ class EventThread(QObject):
 
         self.thread_stop = False
 
-        self.topics = [
-            "StandardEvent",
-            "GUIRefreshEvent",
-            "LiveMode",
-            "Acquisition",
-            "GUI",
-            "Hardware",
-            "Settings",
-            "NewImage",
-        ]
+        if topics.lower() == "all":
+            self.topics = [
+                "StandardEvent",
+                "GUIRefreshEvent",
+                "LiveMode",
+                "Acquisition",
+                "GUI",
+                "Hardware",
+                "Settings",
+                "NewImage",
+            ]
+        else:
+            self.topics = topics
+
         for topic in self.topics:
             self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
         # Set up the main listener Thread
         self.thread = QThread()
-        self.listener = EventListener(self.socket, self.event_sockets, self.bridge, self.thread,
-                                      self.live_images)
+        self.listener = EventListener(
+            self.socket, self.event_sockets, self.bridge, self.thread, self.live_images
+        )
         self.listener.moveToThread(self.thread)
         self.thread.started.connect(self.listener.start)
         self.listener.stop_thread_event.connect(self.stop)
@@ -105,8 +111,14 @@ class EventListener(QObject):
     xy_stage_position_changed_event = Signal(tuple)
     stage_position_changed_event = Signal(float)
 
-    def __init__(self, socket, event_sockets, bridge: Bridge, thread: QThread,
-                 send_live_images: bool = False):
+    def __init__(
+        self,
+        socket,
+        event_sockets,
+        bridge: Bridge,
+        thread: QThread,
+        send_live_images: bool = False,
+    ):
         """Store passed arguments and starting time for frequency limitation of certain events."""
         super().__init__()
         self.send_live_images = send_live_images
@@ -154,10 +166,13 @@ class EventListener(QObject):
                     image_bit = str(self.socket.recv())
                     # TODO: Maybe this should also be done for other bitdepths?!
                     image_depth = np.uint16 if image_bit == "b'2'" else np.uint8
-                    image_message = self.socket.recv()
-                    py_image = self.image_from_message(image_message, reply, image_depth)
+                    metadata = self.socket.recv()
+                    metadata_dict = json.loads(str(metadata)[11:-1])
+                    next_message = self.socket.recv()
+                    py_image = self.image_from_message(
+                        next_message, reply, image_depth, metadata_dict
+                    )
                     self.new_image_event.emit(py_image)
-                    continue
 
                 print(eventString)
                 if "DefaultAcquisitionStartedEvent" in eventString:
@@ -173,10 +188,7 @@ class EventListener(QObject):
                         evt.get_device(), evt.get_property(), evt.get_value()
                     )
                 elif "DefaultStagePositionChangedEvent" in eventString:
-                    if (
-                        self.blockZ > 0
-                        or time.perf_counter() - self.last_stage_position < 0.05
-                    ):
+                    if self.blockZ > 0 or time.perf_counter() - self.last_stage_position < 0.05:
                         print("BLOCKED ", self.blockZ)
                     else:
                         self.stage_position_changed_event.emit(evt.get_pos() * 100)
@@ -194,21 +206,20 @@ class EventListener(QObject):
                         self.blockImages = evt.get_is_on()
                     self.live_mode_event.emit(self.blockImages)
                 elif "XYStagePositionChangedEvent" in eventString:
-                    self.xy_stage_position_changed_event.emit(
-                        (evt.get_x_pos(), evt.get_y_pos())
-                    )
+                    self.xy_stage_position_changed_event.emit((evt.get_x_pos(), evt.get_y_pos()))
             except zmq.error.Again:
                 self.timeouts += 1
                 # print("Server timeout", self.timeouts)
                 pass
 
-    def image_from_message(self, message, reply, image_depth):
+    def image_from_message(self, message, reply, image_depth, metadata_dict):
         image = np.frombuffer(message, dtype=image_depth)
         image_params = re.split("NewImage ", reply)[1]
         image_params = re.split(", ", image_params[1:-2])
         image_params = [int(round(float(x))) for x in image_params]
         py_image = PyImage(
             image.reshape([int(image_params[0]), int(image_params[1])]),
+            metadata_dict,
             *image_params[2:]
         )
         return py_image

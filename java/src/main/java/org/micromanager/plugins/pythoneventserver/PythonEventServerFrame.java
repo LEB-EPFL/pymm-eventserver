@@ -3,7 +3,9 @@ package org.micromanager.plugins.pythoneventserver;
 
 import com.google.common.eventbus.Subscribe;
 import mmcorej.CMMCore;
+import mmcorej.org.json.JSONException;
 import mmcorej.org.json.JSONObject;
+import org.micromanager.PropertyMap;
 import org.micromanager.Studio;
 import org.micromanager.acquisition.AcquisitionEndedEvent;
 import org.micromanager.acquisition.AcquisitionSequenceStartedEvent;
@@ -11,19 +13,23 @@ import org.micromanager.acquisition.SequenceSettings;
 import org.micromanager.data.DataProviderHasNewImageEvent;
 import org.micromanager.data.Datastore;
 import org.micromanager.data.Image;
+import org.micromanager.data.Metadata;
 import org.micromanager.events.*;
 import org.micromanager.internal.ConfigGroupPad;
 import org.micromanager.internal.MMStudio;
 import org.micromanager.internal.interfaces.AcqSettingsListener;
-import org.micromanager.internal.utils.MustCallOnEDT;
 import org.micromanager.internal.utils.WindowPositioning;
 import org.micromanager.internal.zmq.ZMQUtil;
 import org.zeromq.SocketType;
 
-import java.awt.event.*;
+
 import javax.swing.*;
 import javax.swing.text.DefaultCaret;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.*;
 
 import static org.zeromq.ZMQ.*;
@@ -293,6 +299,7 @@ public class PythonEventServerFrame extends JFrame {
 //         event.getDataViewer().getDataProvider().unregisterForEvents(this);
 //      }
 
+
       @Subscribe
       public void onAcquisitionSequenceStarted(AcquisitionSequenceStartedEvent event) {
          sendJSON(event, "Acquisition ");
@@ -344,24 +351,27 @@ public class PythonEventServerFrame extends JFrame {
          logTextArea.setText(newEvent + "\n" + currentText);
        }
 
-      public void sendImage(DataProviderHasNewImageEvent event){
-         Image image = event.getImage();
-         ArrayList<Float> imageParams = new ArrayList<>();
-         imageParams.add((float) image.getWidth());
-         imageParams.add((float) image.getHeight());
-         imageParams.add((float) image.getCoords().getT());
-         imageParams.add((float) image.getCoords().getC());
-         imageParams.add((float) image.getCoords().getZ());
-         imageParams.add((float) image.getMetadata().getElapsedTimeMs(0));
-         blockSocket_ = true;
-         socket_.sendMore("NewImage " + imageParams);
-         socket_.sendMore(String.valueOf(image.getBytesPerComponent()));
-         socket_.send(image.getByteArray());
-         blockSocket_ = false;
-         addLog("NewImage");
-      }
+       public void sendImage(DataProviderHasNewImageEvent event){
+          Image image = event.getImage();
+          ArrayList<Float> imageParams = new ArrayList<>();
+          imageParams.add((float) image.getWidth());
+          imageParams.add((float) image.getHeight());
+          imageParams.add((float) image.getCoords().getT());
+          imageParams.add((float) image.getCoords().getC());
+          imageParams.add((float) image.getCoords().getZ());
+          imageParams.add((float) image.getMetadata().getElapsedTimeMs(0));
+          socket_.sendMore("NewImage " + imageParams);
+          socket_.sendMore(String.valueOf(image.getBytesPerComponent()));
+          try {
+             socket_.sendMore("Metadata " + metadataToJson(image.getMetadata()));
+          } catch (JSONException | InvocationTargetException | IllegalAccessException e) {
+             e.printStackTrace();
+          }
+          socket_.send(image.getByteArray());
+          addLog("NewImage");
+       }
 
-      public void sendJSON(Object event, String type) {
+      public void sendJSON(Object event, String type){
             JSONObject json = new JSONObject();
             util_.serialize(event, json, 5556);
             while (blockSocket_){
@@ -375,6 +385,33 @@ public class PythonEventServerFrame extends JFrame {
             socket_.send(type + json);
          }
       }
+      public JSONObject metadataToJson(Metadata metadata) throws JSONException, InvocationTargetException, IllegalAccessException {
+         JSONObject jsonMetadata = new JSONObject();
+         for (Method method : metadata.getClass().getMethods()){
+            String methodName = method.getName();
+            if (methodName.contains("get") && method.getParameterCount() == 0){
+//               System.out.println(methodName);
+//               System.out.println(method.getReturnType().getName());
+               if (method.getReturnType().getName() == "org.micromanager.PropertyMap"){
+                  PropertyMap output = (PropertyMap) method.invoke(metadata);
+                  JSONObject subJson = new JSONObject();
+                  for (String key : output.keySet()){
+                     subJson.put(key, output.getString(key, "None"));
+                  }
+                  jsonMetadata.put(methodName.replace("get", ""), subJson);
+               } else {
+                  Object output = method.invoke(metadata);
+                  if (output != null){
+                     jsonMetadata.put(methodName.replace("get", ""), output.toString());
+                  }
+               }
+
+            }
+         }
+         metadata.hasElapsedTimeMs();
+         return jsonMetadata;
+      }
+
    }
 
 
