@@ -48,7 +48,7 @@ class EventThread(QObject):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.connect("tcp://localhost:" + SOCKET)
-        self.socket.setsockopt(zmq.RCVTIMEO, 10000)  # Timeout for the recv() function
+        self.socket.setsockopt(zmq.RCVTIMEO, 1000)  # Timeout for the recv() function
 
         self.thread_stop = False
 
@@ -154,20 +154,10 @@ class EventListener(QObject):
                     image_bit = str(self.socket.recv())
                     # TODO: Maybe this should also be done for other bitdepths?!
                     image_depth = np.uint16 if image_bit == "b'2'" else np.uint8
-                    next_message = self.socket.recv()
-                    print(next_message[:4])
-                    if str(next_message[:4]) == "b'Acqu'":  # AcquisitionEndedEvent interrupted
-                        print("Acquisition ENDED?")
-                        next_message = json.loads(re.split(" ", str(next_message))[1][0:-1])
-                        evt, eventString = self.translate_message(next_message, instance)
-                        print(eventString)
-                        image_message = self.socket.recv()
-                        print(image_message[:4])
-                        py_image = self.image_from_message(image_message, reply, image_depth)
-                        self.new_image_event.emit(py_image)
-                    else:
-                        py_image = self.image_from_message(next_message, reply, image_depth)
-                        self.new_image_event.emit(py_image)
+                    image_message = self.socket.recv()
+                    py_image = self.image_from_message(image_message, reply, image_depth)
+                    self.new_image_event.emit(py_image)
+                    continue
 
                 print(eventString)
                 if "DefaultAcquisitionStartedEvent" in eventString:
