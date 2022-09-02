@@ -36,6 +36,9 @@ import static org.zeromq.ZMQ.*;
  * ZMQ PUB socket to publish events that can be subscribed to from
  * python. This can run in parallel with pycromanager to make use
  * of those events.
+ * The implementation takes a lot of inspiration and some methods
+ * from pycromanager and the micro-manager ZMQUtil.
+ * (https://github.com/micro-manager/pycro-manager)
  * <p>
  * To get the events, the thread implements AcqSettingsListener and
  * subscribes to the EventBus via the EventManager of Micro-Manager.
