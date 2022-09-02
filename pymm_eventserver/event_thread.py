@@ -18,8 +18,8 @@ import zmq
 from pycromanager import Bridge
 from qtpy.QtCore import QObject, QThread, Signal, Slot
 
-from .data_structures import MMSettings
-from .data_structures import PyImage
+from pymm_eventserver.data_structures import MMSettings
+from pymm_eventserver.data_structures import PyImage
 
 log = logging.getLogger("EDA")
 SOCKET = "5556"
@@ -53,7 +53,7 @@ class EventThread(QObject):
 
         self.thread_stop = False
 
-        if topics.lower() == "all":
+        if not isinstance(topics, list):
             self.topics = [
                 "StandardEvent",
                 "GUIRefreshEvent",
@@ -198,7 +198,6 @@ class EventListener(QObject):
                     if time.perf_counter() - self.last_custom_mda > 0.2:
                         settings = evt.get_settings()
                         settings = MMSettings(java_settings=settings)
-                        print(settings)
                         self.mda_settings_event.emit(settings)
                     self.last_custom_mda = time.perf_counter()
                 elif "DefaultLiveModeEvent" in eventString:

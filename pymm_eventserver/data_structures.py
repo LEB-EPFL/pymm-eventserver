@@ -6,7 +6,6 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 import numpy as np
 import logging
-
 # MMSettings
 from dataclasses import dataclass
 from typing import List, Any
@@ -72,7 +71,6 @@ class PyImage:
     z_slice: int
     time: int
 
-
 @dataclass
 class MMChannel:
     """Part of a channel as found in the MDA channels list in MM."""
@@ -124,13 +122,13 @@ class MMSettings:
     channel_group: str = None
     use_channels = True
     channels: defaultdict[dict] = field(default_factory=lambda: defaultdict(dict))
-    n_channels: int = 0
+    n_channels: int = 1
 
     slices_start: float = None
     slices_end: float = None
     slices_step: float = None
     slices: List[float] = None
-    n_slices: int = None
+    n_slices: int = 1
     use_slices: bool = False
 
     save_path: Path = None
@@ -138,7 +136,7 @@ class MMSettings:
 
     sweeps_per_frame: int = 1
 
-    acq_order: str = None
+    acq_order: str = 'XYCZT'
     microscope: object = iSIM()
 
     def __post_init__(self):
@@ -167,8 +165,10 @@ class MMSettings:
         for channel_ind in range(self.java_channels.size()):
             channel = self.java_channels.get(channel_ind)
             config = channel.config()
+            color = channel.color()
             self.channels[config] = {
                 "name": config,
+                "color": [color.get_red(), color.get_green(), color.get_blue()],
                 "use": channel.use_channel(),
                 "exposure": channel.exposure(),
                 "z_stack": channel.do_z_stack(),
@@ -183,4 +183,4 @@ class MMSettings:
             self.slices.append(self.java_slices.get(slice_num))
         if len(self.slices) == 0:
             self.slices = [0]
-        self.n_slices = len(self.slices)
+        self.n_slices = max(1, len(self.slices))
