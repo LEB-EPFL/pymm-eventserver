@@ -258,14 +258,14 @@ public class PythonEventServerFrame extends JFrame {
 
          // Limit the frequency of these events
          sendJSON(event, "Hardware ");
-//         addLog("StagePositionChangedEvent");
+         addLog("StagePositionChangedEvent");
          lastStageTime = now;
       }
 
       @Subscribe
       public void onXYStagePositionChanged(XYStagePositionChangedEvent event){
          sendJSON(event, "Hardware ");
-//         addLog("XYStagePositionChangedEvent");
+         addLog("XYStagePositionChangedEvent");
       }
 
       @Subscribe

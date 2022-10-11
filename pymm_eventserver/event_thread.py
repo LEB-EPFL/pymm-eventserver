@@ -110,6 +110,7 @@ class EventListener(QObject):
     live_mode_event = Signal(bool)
     xy_stage_position_changed_event = Signal(tuple)
     stage_position_changed_event = Signal(float)
+    exposure_changed_event = Signal(str, str, str)
 
     def __init__(
         self,
@@ -184,9 +185,13 @@ class EventListener(QObject):
                 elif "DefaultAcquisitionEndedEvent" in eventString:
                     self.acquisition_ended_event.emit(evt)
                 elif "CustomSettingsEvent" in eventString:
-                    self.configuration_settings_event.emit(
-                        evt.get_device(), evt.get_property(), evt.get_value()
-                    )
+                    dev = evt.get_device()
+                    prop = evt.get_property()
+                    val = evt.get_value()
+                    self.configuration_settings_event.emit(dev, prop, val)
+                elif "DefaultExposureChangedEvent" in eventString:
+                    self.exposure_changed_event.emit(
+                        "exposure", "time_ms", str(evt.get_new_exposure_time()))
                 elif "DefaultStagePositionChangedEvent" in eventString:
                     if self.blockZ > 0 or time.perf_counter() - self.last_stage_position < 0.05:
                         print("BLOCKED ", self.blockZ)
