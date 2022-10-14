@@ -217,7 +217,9 @@ class EventListener(QObject):
                 pass
 
     def image_from_message(self, message, reply, image_depth, metadata_dict):
-        image = np.frombuffer(message, dtype=image_depth)
+        dt = np.dtype(image_depth)
+        dt = dt.newbyteorder('>')
+        image = np.frombuffer(message, dtype=dt)
         image_params = re.split("NewImage ", reply)[1]
         image_params = re.split(", ", image_params[1:-2])
         image_params = [int(round(float(x))) for x in image_params]
