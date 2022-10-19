@@ -136,7 +136,7 @@ class MMSettings:
 
     sweeps_per_frame: int = 1
 
-    acq_order: str = 'XYCZT'
+    acq_order: int = 0
     microscope: object = iSIM()
 
     def __post_init__(self):
