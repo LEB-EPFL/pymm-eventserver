@@ -367,8 +367,13 @@ public class PythonEventServerFrame extends JFrame {
           } catch (JSONException | InvocationTargetException | IllegalAccessException e) {
              e.printStackTrace();
           }
+          System.out.println(image.getByteArray());
+          System.out.println(image.getRawPixelsCopy());
+          Object array = image.getRawPixels();
+//          socket_.send(image.getByteArray());
           socket_.send(image.getByteArray());
           addLog("NewImage");
+
        }
 
       public void sendJSON(Object event, String type){

@@ -6,7 +6,6 @@ acquisition. Used with some ImageAnalysers to receive images and to react to sta
 acquisitions.
 """
 
-from ctypes import alignment
 import json
 import logging
 import re

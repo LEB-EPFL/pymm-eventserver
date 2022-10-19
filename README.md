@@ -6,6 +6,14 @@ functionality from PycroManager (https://pycro-manager.readthedocs.io/en/latest/
 
 The server follows the logic of Pycromanager:
 
+Install using pip
+```
+pip install pymm_eventserver
+python
+>>> import pymm_eventserver.setup
+>>> pymm_eventserver.setup.install_java_server()
+```
+
 
 ```mermaid
 sequenceDiagram
