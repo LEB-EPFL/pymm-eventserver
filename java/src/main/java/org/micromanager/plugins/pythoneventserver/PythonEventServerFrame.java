@@ -9,6 +9,7 @@ import org.micromanager.PropertyMap;
 import org.micromanager.Studio;
 import org.micromanager.acquisition.AcquisitionEndedEvent;
 import org.micromanager.acquisition.AcquisitionSequenceStartedEvent;
+import org.micromanager.acquisition.AcquisitionStartedEvent;
 import org.micromanager.acquisition.SequenceSettings;
 import org.micromanager.data.DataProviderHasNewImageEvent;
 import org.micromanager.data.Datastore;
@@ -276,14 +277,12 @@ public class PythonEventServerFrame extends JFrame {
       }
 
 
-//      @Subscribe
-//      public void onAcquisitionStarted(AcquisitionStartedEvent event){
-//         sendJSON(event, "Acquisition ");
-//         store_ = event.getDatastore();
-//         store_.registerForEvents(this);
-//         addLog("AcquisitionStartedEvent");
-//         addLog(store_.getName());
-//      }
+      @Subscribe
+      public void onAcquisitionStarted(AcquisitionStartedEvent event){
+         sendJSON(event, "Acquisition ");
+         addLog("AcquisitionStartedEvent");
+
+      }
 
 //      @Subscribe
 //      public void onDataViewerAddedEvent(DataViewerAddedEvent event) {
