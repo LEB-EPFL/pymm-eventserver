@@ -96,7 +96,7 @@ class iSIM:
 
     manufacturer: str = "Dora"
     model: str = "iSIM"
-    detector: object = PrimeBSI()
+    detector: object = field(default_factory = lambda: PrimeBSI())
 
 
 @dataclass
@@ -137,7 +137,7 @@ class MMSettings:
     sweeps_per_frame: int = 1
 
     acq_order: int = 0
-    microscope: object = iSIM()
+    microscope: object = field(default_factory=lambda: iSIM())
 
     def __post_init__(self):
         """Take the settings from MM as a java object and get the settings are represented here.
