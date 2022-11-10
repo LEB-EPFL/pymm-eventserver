@@ -281,7 +281,6 @@ public class PythonEventServerFrame extends JFrame {
       public void onAcquisitionStarted(AcquisitionStartedEvent event){
          sendJSON(event, "Acquisition ");
          addLog("AcquisitionStartedEvent");
-
       }
 
 //      @Subscribe
@@ -363,8 +362,8 @@ public class PythonEventServerFrame extends JFrame {
           socket_.sendMore(String.valueOf(image.getBytesPerComponent()));
           try {
              socket_.sendMore("Metadata " + metadataToJson(image.getMetadata()));
-          } catch (JSONException | InvocationTargetException | IllegalAccessException e) {
-             e.printStackTrace();
+          } catch (JSONException | InvocationTargetException | IllegalAccessException  e) {
+               e.printStackTrace();
           }
           System.out.println(image.getByteArray());
           System.out.println(image.getRawPixelsCopy());
@@ -400,7 +399,11 @@ public class PythonEventServerFrame extends JFrame {
                   PropertyMap output = (PropertyMap) method.invoke(metadata);
                   JSONObject subJson = new JSONObject();
                   for (String key : output.keySet()){
-                     subJson.put(key, output.getString(key, "None"));
+                     try {
+                        subJson.put(key, output.getString(key, "None"));
+                     } catch (ClassCastException e) {
+                        subJson.put(key, output.getInteger(key, 0));
+                     }
                   }
                   jsonMetadata.put(methodName.replace("get", ""), subJson);
                } else {
