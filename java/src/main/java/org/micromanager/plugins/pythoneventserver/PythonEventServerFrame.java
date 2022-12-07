@@ -150,6 +150,8 @@ public class PythonEventServerFrame extends JFrame {
          socket_ = context.socket(SocketType.PUB);
 //         socket_.bind("tcp://localhost:5556");
          socket_.bind("tcp://*:5556");
+
+
          studio_.events().registerForEvents(this);
          MMStudio studio;
          studio = (MMStudio) studio_;
@@ -214,7 +216,7 @@ public class PythonEventServerFrame extends JFrame {
          for (CustomSettingsEvent setting : changedSettings){
             studio_.events().post(setting);
          }
-         addLog("GUIRefreshEvent");
+//         addLog("GUIRefreshEvent");
       }
 
       // Subscribe to the events that are sent by the special RefreshGUI call above
@@ -242,7 +244,7 @@ public class PythonEventServerFrame extends JFrame {
       @Subscribe
       public void onCustomMDA(CustomMDAEvent event){
          sendJSON(event, "Settings ");
-         addLog("CustomMDAEvent");
+//         addLog("CustomMDAEvent");
       }
 
 
@@ -259,14 +261,14 @@ public class PythonEventServerFrame extends JFrame {
 
          // Limit the frequency of these events
          sendJSON(event, "Hardware ");
-         addLog("StagePositionChangedEvent");
+//         addLog("StagePositionChangedEvent");
          lastStageTime = now;
       }
 
       @Subscribe
       public void onXYStagePositionChanged(XYStagePositionChangedEvent event){
          sendJSON(event, "Hardware ");
-         addLog("XYStagePositionChangedEvent");
+//         addLog("XYStagePositionChangedEvent");
       }
 
       @Subscribe
@@ -316,7 +318,7 @@ public class PythonEventServerFrame extends JFrame {
       @Subscribe
       public void onDataProviderHasNewImageEvent(DataProviderHasNewImageEvent event){
          sendImage(event);
-         addLog("DataProviderHasNewImageEvent");
+//         addLog("DataProviderHasNewImageEvent");
       }
 
 //      @Subscribe
@@ -326,12 +328,16 @@ public class PythonEventServerFrame extends JFrame {
 
       @Subscribe
       public void onLiveMode(LiveModeEvent event) {
+         System.out.println(event.toString());
+         System.out.println(event.isOn());
+         System.out.println(liveCheckBox_.isSelected());
          if (event.isOn() & liveCheckBox_.isSelected()) {
             studio_.getSnapLiveManager().getDisplay().getDataProvider().registerForEvents(this);
          } else {
             studio_.getSnapLiveManager().getDisplay().getDataProvider().unregisterForEvents(this);
          }
          sendJSON(event, "LiveMode ");
+         clearLog();
          addLog("LiveModeEvent");
       }
 
@@ -342,6 +348,10 @@ public class PythonEventServerFrame extends JFrame {
 //         addLog("ImageOverwritten");
 //      }
 
+
+      void clearLog(){
+         logTextArea.setText("");
+      }
 
       void addLog(String eventMsg){
          String currentText = logTextArea.getText();
@@ -365,12 +375,12 @@ public class PythonEventServerFrame extends JFrame {
           } catch (JSONException | InvocationTargetException | IllegalAccessException  e) {
                e.printStackTrace();
           }
-          System.out.println(image.getByteArray());
-          System.out.println(image.getRawPixelsCopy());
-          Object array = image.getRawPixels();
+//          System.out.println(image.getByteArray());
+//          System.out.println(image.getRawPixelsCopy());
+//          Object array = image.getRawPixels();
 //          socket_.send(image.getByteArray());
           socket_.send(image.getByteArray());
-          addLog("NewImage");
+//          addLog("Image sent");
 
        }
 

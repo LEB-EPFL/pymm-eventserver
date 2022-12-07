@@ -14,7 +14,8 @@ from typing import Union
 import numpy as np
 
 import zmq
-from pycromanager import Bridge
+from pycromanager import JavaObject, Studio, Core
+from pycromanager.zmq_bridge._bridge import _Bridge
 from qtpy.QtCore import QObject, QThread, Signal, Slot
 
 from pymm_eventserver.data_structures import MMSettings
@@ -33,16 +34,14 @@ class EventThread(QObject):
 
         self.live_images = live_images
 
-        self.bridge = Bridge(debug=False)
+        self.bridge = _Bridge(debug=False)
 
         # Make sockets that events circle through to always have a ready socket
         self.event_sockets = []
         self.num_sockets = 5
         for socket in range(self.num_sockets):
-            socket_provider = self.bridge._construct_java_object(
-                "org.micromanager.Studio", new_socket=True
-            )
-            self.event_sockets.append(socket_provider._socket)
+            bridge = _Bridge()
+            self.event_sockets.append(bridge)
 
         # PUB/SUB implementation of ZMQ
         self.context = zmq.Context()
@@ -115,7 +114,7 @@ class EventListener(QObject):
         self,
         socket,
         event_sockets,
-        bridge: Bridge,
+        bridge: _Bridge,
         thread: QThread,
         send_live_images: bool = False,
     ):
@@ -126,6 +125,8 @@ class EventListener(QObject):
         self.socket = socket
         self.event_sockets = event_sockets
         self.bridge = bridge
+        self.studio = Studio()
+        self.core = Core()
         self.thread = thread
         # Record times for events that we receive twice
         self.last_acq_started = time.perf_counter()
@@ -156,6 +157,7 @@ class EventListener(QObject):
                 # topic = re.split(' ', reply)[0][2:]
 
                 # Translate the event to a shadow object
+
                 try:
                     message = json.loads(re.split(" ", reply)[1][0:-1])
                     evt, eventString = self.translate_message(message, instance)
@@ -173,7 +175,6 @@ class EventListener(QObject):
                         next_message, reply, image_depth, metadata_dict
                     )
                     self.new_image_event.emit(py_image)
-
                 print(eventString)
                 if "DefaultAcquisitionStartedEvent" in eventString:
                     if time.perf_counter() - self.last_acq_started > 0.2:
@@ -236,9 +237,8 @@ class EventListener(QObject):
         log.info(eventString)
         pre_evt = self.bridge._class_factory.create(message)
         evt = pre_evt(
-            socket=self.event_sockets[socket_num],
             serialized_object=message,
-            bridge=self.bridge,
+            bridge=self.event_sockets[socket_num],
         )
         return evt, eventString
 
