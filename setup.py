@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pymm_eventserver",
-    version="0.1.18",
+    version="0.1.19",
     description="Micro-Manager PythonEventServer",
     long_description=long_description,
     long_description_content_type="text/markdown",
